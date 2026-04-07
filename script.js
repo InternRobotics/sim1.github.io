@@ -143,6 +143,28 @@ SIM1.heroTryAutoplay = () => {};
     let hqUpgradeCount = 0;
     let lowUpgradeCount = 0;
 
+    /** Gate YouTube until every adaptive video with superUrl has tried super (canplay or error → fallback). */
+    const youtubeSuperPending = new Set();
+    const youtubeSuperReadyCallbacks = [];
+
+    function markYoutubeSuperReady(v) {
+        if (!youtubeSuperPending.has(v)) return;
+        youtubeSuperPending.delete(v);
+        if (youtubeSuperPending.size === 0) {
+            youtubeSuperReadyCallbacks.splice(0).forEach((fn) => {
+                try {
+                    fn();
+                } catch (e) {}
+            });
+        }
+    }
+
+    SIM1.onAllSuperLowReadyForYoutube = function (cb) {
+        if (typeof cb !== 'function') return;
+        if (youtubeSuperPending.size === 0) cb();
+        else youtubeSuperReadyCallbacks.push(cb);
+    };
+
     const IO_OPTS = { rootMargin: '75% 0px 75% 0px', threshold: [0, 0.05, 0.15, 0.35, 0.6, 1] };
 
     function toSuperLowUrl(hqUrl) {
@@ -320,6 +342,29 @@ SIM1.heroTryAutoplay = () => {};
         }
     }
 
+    function beginSuperLoad(v, st) {
+        if (st.phase !== 'idle' || !st.superUrl) return;
+        st.phase = 'loading-super';
+        const onSuperErr = () => {
+            v.removeEventListener('error', onSuperErr);
+            v.removeEventListener('canplay', onSuperOk);
+            markYoutubeSuperReady(v);
+            loadLowOrHqFromIdle(v, st);
+        };
+        const onSuperOk = () => {
+            v.removeEventListener('error', onSuperErr);
+            st.phase = 'super';
+            markYoutubeSuperReady(v);
+            tryPlayAdaptive(v);
+            scheduleLowUpgrades();
+            scheduleHqUpgrades();
+        };
+        v.addEventListener('error', onSuperErr);
+        v.addEventListener('canplay', onSuperOk, { once: true });
+        v.src = st.superUrl;
+        v.load();
+    }
+
     function ensureAdaptiveLoad(v, st) {
         if (!st.inView) return;
         if (st.upgrading || st.upgradingLow) return;
@@ -339,23 +384,7 @@ SIM1.heroTryAutoplay = () => {};
 
         if (st.phase === 'idle') {
             if (st.superUrl) {
-                st.phase = 'loading-super';
-                const onSuperErr = () => {
-                    v.removeEventListener('error', onSuperErr);
-                    v.removeEventListener('canplay', onSuperOk);
-                    loadLowOrHqFromIdle(v, st);
-                };
-                const onSuperOk = () => {
-                    v.removeEventListener('error', onSuperErr);
-                    st.phase = 'super';
-                    tryPlayAdaptive(v);
-                    scheduleLowUpgrades();
-                    scheduleHqUpgrades();
-                };
-                v.addEventListener('error', onSuperErr);
-                v.addEventListener('canplay', onSuperOk, { once: true });
-                v.src = st.superUrl;
-                v.load();
+                beginSuperLoad(v, st);
             } else {
                 loadLowOrHqFromIdle(v, st);
             }
@@ -522,6 +551,21 @@ SIM1.heroTryAutoplay = () => {};
         };
         adaptiveState.set(el, st);
         adaptiveVideos.add(el);
+        if (st.superUrl) {
+            youtubeSuperPending.add(el);
+            const ric =
+                window.requestIdleCallback ||
+                function (cb) {
+                    return window.setTimeout(() => cb({ didTimeout: false }), 1);
+                };
+            ric(
+                () => {
+                    const s2 = adaptiveState.get(el);
+                    if (s2 && s2.phase === 'idle') beginSuperLoad(el, s2);
+                },
+                { timeout: 4000 }
+            );
+        }
         io.observe(el);
     }
 
@@ -1426,7 +1470,7 @@ console.log('Psi0 Website Loaded Successfully!');
     }
 })();
 
-// Defer YouTube coverflow until Hero adaptive video can play (prioritize super-low MP4 bandwidth)
+// Defer YouTube until every adaptive video has finished super-low load (canplay or fallback); see SIM1.onAllSuperLowReadyForYoutube
 (() => {
     let done = false;
     function startCoverflowYt() {
@@ -1436,11 +1480,10 @@ console.log('Psi0 Website Loaded Successfully!');
             SIM1.startCoverflowYoutube();
         }
     }
-    const demo = document.getElementById('demoVideo');
-    if (demo) {
-        demo.addEventListener('canplay', startCoverflowYt, { once: true });
-        window.setTimeout(startCoverflowYt, 14000);
+    if (window.SIM1 && typeof SIM1.onAllSuperLowReadyForYoutube === 'function') {
+        SIM1.onAllSuperLowReadyForYoutube(startCoverflowYt);
     } else {
         window.setTimeout(startCoverflowYt, 0);
     }
+    window.setTimeout(startCoverflowYt, 90000);
 })();
