@@ -139,6 +139,59 @@ if (demoVideo && demoWrapper) {
         return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
     }
 
+    // First frame as poster (JPEG data URL), then play only when poster is ready AND canplay
+    let heroPosterReady = false;
+    let heroCanPlay = false;
+    function tryHeroAutoplay() {
+        if (!heroPosterReady || !heroCanPlay) return;
+        demoVideo.play().catch(() => {});
+    }
+
+    function captureHeroPoster() {
+        if (heroPosterReady) return true;
+        try {
+            const w = demoVideo.videoWidth;
+            const h = demoVideo.videoHeight;
+            if (!w || !h) return false;
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(demoVideo, 0, 0);
+            demoVideo.poster = canvas.toDataURL('image/jpeg', 0.82);
+            heroPosterReady = true;
+            demoWrapper.classList.add('demo-poster-ready');
+            tryHeroAutoplay();
+            return true;
+        } catch (e) {
+            heroPosterReady = true;
+            demoWrapper.classList.add('demo-poster-ready');
+            tryHeroAutoplay();
+            return true;
+        }
+    }
+
+    demoVideo.addEventListener('loadeddata', function onHeroLoadedData() {
+        if (captureHeroPoster()) return;
+        const onSeeked = () => {
+            demoVideo.removeEventListener('seeked', onSeeked);
+            captureHeroPoster();
+        };
+        demoVideo.addEventListener('seeked', onSeeked);
+        demoVideo.currentTime = 0;
+    }, { once: true });
+
+    demoVideo.addEventListener('canplay', () => {
+        heroCanPlay = true;
+        tryHeroAutoplay();
+    }, { once: true });
+
+    demoVideo.addEventListener('error', () => {
+        heroPosterReady = true;
+        demoWrapper.classList.add('demo-poster-ready');
+        heroCanPlay = true;
+        tryHeroAutoplay();
+    });
+
     const progressBar   = demoWrapper.querySelector('.progress-bar');
     const progressFilled = demoWrapper.querySelector('.progress-filled');
     const currentTimeEl = demoWrapper.querySelector('.current-time');
@@ -185,7 +238,6 @@ if (demoVideo && demoWrapper) {
         if (e.key === 'ArrowRight')   demoVideo.currentTime = Math.min(demoVideo.duration, demoVideo.currentTime + 5);
     });
 
-    demoVideo.play().catch(() => {});
 }
 
 // Chart bar animations on scroll

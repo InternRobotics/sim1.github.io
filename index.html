@@ -121,7 +121,7 @@
         </div>
         <div class="video-container">
             <div class="video-wrapper">
-                <video id="demoVideo" class="demo-video" autoplay muted loop playsinline>
+                <video id="demoVideo" class="demo-video" muted loop playsinline preload="auto">
                     <source src="videos/real2sim2real.mp4" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
@@ -180,25 +180,40 @@
                             <div class="coverflow-track" id="coverflowTrack" role="list">
                                 <article class="coverflow-slide pos-center" data-index="0" role="listitem">
                                     <div class="coverflow-frame">
-                                        <video class="coverflow-vid" muted playsinline preload="metadata">
-                                            <source src="videos/data_video/zip_1.mp4" type="video/mp4">
-                                        </video>
+                                        <iframe
+                                            id="coverflowYt0"
+                                            class="coverflow-yt"
+                                            title="SIM1 long-horizon task replay 1"
+                                            src="https://www.youtube.com/embed/tsPLa-1Lygw?playsinline=1&amp;rel=0&amp;modestbranding=1&amp;enablejsapi=1&amp;mute=1"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                            allowfullscreen
+                                        ></iframe>
                                         <span class="coverflow-speed-badge">20× Speed</span>
                                     </div>
                                 </article>
                                 <article class="coverflow-slide pos-right" data-index="1" role="listitem">
                                     <div class="coverflow-frame">
-                                        <video class="coverflow-vid" muted playsinline preload="metadata">
-                                            <source src="videos/data_video/zip_10.mp4" type="video/mp4">
-                                        </video>
+                                        <iframe
+                                            id="coverflowYt1"
+                                            class="coverflow-yt"
+                                            title="SIM1 long-horizon task replay 2"
+                                            src="https://www.youtube.com/embed/LXStHGWHh18?playsinline=1&amp;rel=0&amp;modestbranding=1&amp;enablejsapi=1&amp;mute=1"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                            allowfullscreen
+                                        ></iframe>
                                         <span class="coverflow-speed-badge">20× Speed</span>
                                     </div>
                                 </article>
                                 <article class="coverflow-slide pos-left" data-index="2" role="listitem">
                                     <div class="coverflow-frame">
-                                        <video class="coverflow-vid" muted playsinline preload="metadata">
-                                            <source src="videos/data_video/zip_3.mp4" type="video/mp4">
-                                        </video>
+                                        <iframe
+                                            id="coverflowYt2"
+                                            class="coverflow-yt"
+                                            title="SIM1 long-horizon task replay 3"
+                                            src="https://www.youtube.com/embed/zesn7aK9sgQ?playsinline=1&amp;rel=0&amp;modestbranding=1&amp;enablejsapi=1&amp;mute=1"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                            allowfullscreen
+                                        ></iframe>
                                         <span class="coverflow-speed-badge">20× Speed</span>
                                     </div>
                                 </article>
@@ -629,7 +644,7 @@
                 'Could not load the PCA 3D viewer (Three.js module failed). Check network/CDN access, or open this site via a local server: python3 -m http.server in the Webpage folder.';
         });
     </script>
-    <script src="scripts/kai-coverflow.js?v=3"></script>
+    <script src="scripts/kai-coverflow.js?v=4"></script>
     <script src="script.js?v=8"></script>
     <script src="scripts/results-chart.js?v=3"></script>
     <script src="scripts/results-chart-2.js?v=3"></script>

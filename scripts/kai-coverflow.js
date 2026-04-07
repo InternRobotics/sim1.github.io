@@ -1,6 +1,7 @@
 /**
  * Kai0-style coverflow: center large, sides small; left/right click to switch;
- * current video ends → auto-advance to next.
+ * YouTube embeds: play center, pause sides; current video ends → auto-advance.
+ * Quality is chosen by YouTube’s adaptive stream (ABR).
  */
 (function () {
     var root = document.getElementById('kaiTaskReel');
@@ -17,6 +18,7 @@
     var n = slides.length;
     var active = 0;
     var prevActive = -1;
+    var players = [];
 
     function relPos(i) {
         return (i - active + n) % n;
@@ -36,13 +38,24 @@
 
         slides.forEach(function (slide, i) {
             var v = slide.querySelector('video');
-            if (!v) return;
+            if (v) {
+                if (relPos(i) === 0) {
+                    if (changed) v.currentTime = 0;
+                    var p = v.play();
+                    if (p && typeof p.catch === 'function') p.catch(function () {});
+                } else {
+                    v.pause();
+                }
+                return;
+            }
+
+            var pl = players[i];
+            if (!pl || typeof pl.playVideo !== 'function') return;
             if (relPos(i) === 0) {
-                if (changed) v.currentTime = 0;
-                var p = v.play();
-                if (p && typeof p.catch === 'function') p.catch(function () {});
+                if (changed && typeof pl.seekTo === 'function') pl.seekTo(0, true);
+                pl.playVideo();
             } else {
-                v.pause();
+                pl.pauseVideo();
             }
         });
     }
@@ -54,15 +67,6 @@
 
     if (hitLeft) hitLeft.addEventListener('click', function () { go(-1); });
     if (hitRight) hitRight.addEventListener('click', function () { go(1); });
-
-    slides.forEach(function (slide, i) {
-        var v = slide.querySelector('video');
-        if (!v) return;
-        v.addEventListener('ended', function () {
-            if (active !== i) return;
-            go(1);
-        });
-    });
 
     root.setAttribute('tabindex', '-1');
     root.addEventListener('keydown', function (e) {
@@ -118,6 +122,12 @@
         { passive: true }
     );
 
+    function pauseAllYoutube() {
+        players.forEach(function (pl) {
+            if (pl && typeof pl.pauseVideo === 'function') pl.pauseVideo();
+        });
+    }
+
     if ('IntersectionObserver' in window && viewport) {
         var io = new IntersectionObserver(
             function (entries) {
@@ -129,6 +139,7 @@
                             var v = slide.querySelector('video');
                             if (v) v.pause();
                         });
+                        pauseAllYoutube();
                     }
                 });
             },
@@ -137,5 +148,77 @@
         io.observe(viewport);
     }
 
-    applyLayout();
+    function bindNativeVideos() {
+        slides.forEach(function (slide, i) {
+            var v = slide.querySelector('video');
+            if (!v) return;
+            v.addEventListener('ended', function () {
+                if (active !== i) return;
+                go(1);
+            });
+        });
+    }
+
+    function initYoutubePlayers() {
+        if (typeof YT === 'undefined' || typeof YT.Player === 'undefined') return;
+
+        var ytItems = [];
+        slides.forEach(function (slide, i) {
+            var iframe = slide.querySelector('.coverflow-yt');
+            if (iframe && iframe.id) ytItems.push({ index: i, id: iframe.id });
+        });
+
+        if (!ytItems.length) {
+            applyLayout();
+            return;
+        }
+
+        var ready = 0;
+        var total = ytItems.length;
+
+        ytItems.forEach(function (item) {
+            var i = item.index;
+            players[i] = new YT.Player(item.id, {
+                events: {
+                    onStateChange: function (e) {
+                        if (typeof YT === 'undefined' || !YT.PlayerState) return;
+                        if (e.data === YT.PlayerState.ENDED && active === i) go(1);
+                    },
+                    onReady: function () {
+                        ready += 1;
+                        if (ready === total) applyLayout();
+                    }
+                }
+            });
+        });
+    }
+
+    var hasYoutube = root.querySelector('.coverflow-yt');
+    if (hasYoutube) {
+        slides.forEach(function (slide) {
+            var iframe = slide.querySelector('.coverflow-yt');
+            if (!iframe || !iframe.src) return;
+            try {
+                var u = new URL(iframe.src);
+                u.searchParams.set('origin', window.location.origin);
+                iframe.src = u.toString();
+            } catch (e) {}
+        });
+        applyLayout();
+        window.onYouTubeIframeAPIReady = function () {
+            initYoutubePlayers();
+        };
+        if (typeof YT !== 'undefined' && YT.Player) {
+            initYoutubePlayers();
+        } else {
+            var tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            var firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        }
+    } else {
+        bindNativeVideos();
+        applyLayout();
+    }
 })();
+

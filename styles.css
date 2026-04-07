@@ -831,6 +831,16 @@ body.theme-light .citation-copy-btn:hover {
     object-fit: cover;
 }
 
+/* Hide video until first-frame poster is captured (avoids black flash while large file buffers) */
+.video-wrapper:not(.demo-poster-ready) .demo-video {
+    opacity: 0;
+}
+
+.video-wrapper.demo-poster-ready .demo-video {
+    opacity: 1;
+    transition: opacity 0.28s ease;
+}
+
 /* ── Unified Video Player Controls ── */
 
 /* Center play/pause button (appears on hover or when paused) */
@@ -1268,6 +1278,15 @@ body.theme-light .citation-copy-btn:hover {
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+.coverflow-yt {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
 }
 
 .coverflow-speed-badge {
