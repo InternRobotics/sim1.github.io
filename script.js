@@ -129,6 +129,307 @@ document.querySelectorAll('.section').forEach(section => {
     observer.observe(section);
 });
 
+// ── Adaptive video loading (viewport priority + low → HQ) ──
+// Mirror layout: videos/foo/bar.mp4 → videos_low/foo/bar.mp4 (generate with ffmpeg; missing low falls back to HQ).
+window.SIM1 = window.SIM1 || {};
+SIM1.heroTryAutoplay = () => {};
+
+(function initAdaptiveVideoLoading() {
+    const adaptiveVideos = new Set();
+    const adaptiveState = new WeakMap();
+    const hqRingMeta = new WeakMap();
+    const MAX_CONCURRENT_HQ = 2;
+    let hqUpgradeCount = 0;
+
+    const IO_OPTS = { rootMargin: '75% 0px 75% 0px', threshold: [0, 0.05, 0.15, 0.35, 0.6, 1] };
+
+    function toLowUrl(hqUrl) {
+        if (!hqUrl || !hqUrl.startsWith('videos/')) return null;
+        return 'videos_low/' + hqUrl.slice('videos/'.length);
+    }
+
+    function viewportCenterScore(el) {
+        const r = el.getBoundingClientRect();
+        if (r.width < 2 && r.height < 2) return -1e9;
+        const cy = (r.top + r.bottom) / 2;
+        const mid = window.innerHeight * 0.5;
+        return 1000 - Math.abs(cy - mid);
+    }
+
+    function bufferedFraction(v) {
+        if (!v.duration || !Number.isFinite(v.duration) || v.duration <= 0) return 0;
+        let end = 0;
+        for (let i = 0; i < v.buffered.length; i++) {
+            end = Math.max(end, v.buffered.end(i));
+        }
+        return Math.min(1, end / v.duration);
+    }
+
+    function attachHqRing(v) {
+        if (hqRingMeta.has(v)) return;
+        const host = v.closest('.solver-vid-wrap, .method-video-wrapper, .video-wrapper') || v.parentElement;
+        if (!host) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'video-hq-ring';
+        wrap.setAttribute('aria-hidden', 'true');
+        wrap.innerHTML =
+            '<svg viewBox="0 0 24 24" width="100%" height="100%" aria-hidden="true">' +
+            '<circle class="video-hq-ring-track" cx="12" cy="12" r="9" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="2"/>' +
+            '<circle class="video-hq-ring-prog" cx="12" cy="12" r="9" fill="none" stroke="rgba(255,255,255,0.72)" stroke-width="2" ' +
+            'stroke-linecap="round" transform="rotate(-90 12 12)"/>' +
+            '</svg>';
+        host.appendChild(wrap);
+        const prog = wrap.querySelector('.video-hq-ring-prog');
+        const R = 9;
+        const circumference = 2 * Math.PI * R;
+        prog.style.strokeDasharray = String(circumference);
+        prog.style.strokeDashoffset = String(circumference);
+        hqRingMeta.set(v, { wrap, prog, circumference });
+    }
+
+    function updateHqRingProgress(v) {
+        const m = hqRingMeta.get(v);
+        if (!m || !m.wrap.classList.contains('is-visible')) return;
+        const dur = v.duration;
+        let frac = 0;
+        if (dur && Number.isFinite(dur) && dur > 0) {
+            frac = bufferedFraction(v);
+        }
+        m.prog.style.strokeDashoffset = String(m.circumference * (1 - frac));
+        m.wrap.classList.toggle('video-hq-ring--pulse', frac < 0.02 && !(dur && dur > 0));
+    }
+
+    function stopHqRingLoad(v, st) {
+        if (!st) return;
+        if (st._ringOnProg) {
+            v.removeEventListener('progress', st._ringOnProg);
+            st._ringOnProg = null;
+        }
+        if (st._ringOnCap) {
+            v.removeEventListener('canplaythrough', st._ringOnCap);
+            st._ringOnCap = null;
+        }
+        if (st._ringInterval) {
+            clearInterval(st._ringInterval);
+            st._ringInterval = null;
+        }
+        st.ringSession = (st.ringSession || 0) + 1;
+        const m = hqRingMeta.get(v);
+        if (m) {
+            m.wrap.classList.remove('is-visible', 'video-hq-ring--pulse');
+        }
+    }
+
+    /** Show ring + track buffer until canplaythrough or ~full buffer. */
+    function startHqRingLoad(v, st) {
+        stopHqRingLoad(v, st);
+        attachHqRing(v);
+        const m = hqRingMeta.get(v);
+        if (!m) return;
+        const sid = st.ringSession;
+        m.wrap.classList.add('is-visible');
+        updateHqRingProgress(v);
+
+        const cleanup = () => {
+            if (st.ringSession !== sid) return;
+            if (st._ringOnProg) {
+                v.removeEventListener('progress', st._ringOnProg);
+                st._ringOnProg = null;
+            }
+            if (st._ringOnCap) {
+                v.removeEventListener('canplaythrough', st._ringOnCap);
+                st._ringOnCap = null;
+            }
+            if (st._ringInterval) {
+                clearInterval(st._ringInterval);
+                st._ringInterval = null;
+            }
+            m.wrap.classList.remove('is-visible', 'video-hq-ring--pulse');
+        };
+
+        const onProg = () => {
+            if (st.ringSession !== sid) return;
+            updateHqRingProgress(v);
+            if (bufferedFraction(v) >= 0.992) cleanup();
+        };
+
+        const onCap = () => cleanup();
+
+        st._ringOnProg = onProg;
+        st._ringOnCap = onCap;
+        v.addEventListener('progress', onProg);
+        v.addEventListener('canplaythrough', onCap, { once: true });
+        st._ringInterval = window.setInterval(() => {
+            onProg();
+        }, 280);
+        window.setTimeout(() => {
+            if (st.ringSession === sid) cleanup();
+        }, 120000);
+    }
+
+    function tryPlayAdaptive(v) {
+        if (v.id === 'demoVideo') {
+            SIM1.heroTryAutoplay();
+            return;
+        }
+        v.play().catch(() => {});
+    }
+
+    function ensureLowOrHq(v, st) {
+        if (!st.inView) return;
+        if (st.upgrading) return;
+        if (st.phase === 'hq') {
+            tryPlayAdaptive(v);
+            return;
+        }
+        if (st.phase === 'low' && v.readyState >= 2 && !v.error) {
+            tryPlayAdaptive(v);
+            return;
+        }
+        if (st.phase === 'loading-low' || st.phase === 'loading-hq') return;
+
+        if (st.phase === 'idle') {
+            if (st.lowUrl) {
+                st.phase = 'loading-low';
+                const onLowErr = () => {
+                    v.removeEventListener('error', onLowErr);
+                    v.removeEventListener('canplay', onLowOk);
+                    st.phase = 'loading-hq';
+                    startHqRingLoad(v, st);
+                    v.src = st.hqUrl;
+                    v.load();
+                    const onHq = () => {
+                        st.phase = 'hq';
+                        tryPlayAdaptive(v);
+                    };
+                    v.addEventListener('canplay', onHq, { once: true });
+                    v.addEventListener('error', () => {
+                        st.phase = 'idle';
+                        stopHqRingLoad(v, st);
+                    }, { once: true });
+                };
+                const onLowOk = () => {
+                    v.removeEventListener('error', onLowErr);
+                    st.phase = 'low';
+                    tryPlayAdaptive(v);
+                    scheduleHqUpgrades();
+                };
+                v.addEventListener('error', onLowErr);
+                v.addEventListener('canplay', onLowOk, { once: true });
+                v.src = st.lowUrl;
+                v.load();
+            } else {
+                st.phase = 'loading-hq';
+                startHqRingLoad(v, st);
+                v.src = st.hqUrl;
+                v.load();
+                v.addEventListener('canplay', () => {
+                    st.phase = 'hq';
+                    tryPlayAdaptive(v);
+                }, { once: true });
+                v.addEventListener('error', () => {
+                    st.phase = 'idle';
+                    stopHqRingLoad(v, st);
+                }, { once: true });
+            }
+        }
+    }
+
+    function startHqUpgrade(v, st) {
+        if (!st.lowUrl || st.phase !== 'low' || st.upgrading) return;
+        st.upgrading = true;
+        hqUpgradeCount++;
+        const t = v.currentTime;
+        const wasPlaying = !v.paused;
+        startHqRingLoad(v, st);
+        const onDone = () => {
+            v.removeEventListener('canplay', onDone);
+            v.removeEventListener('error', onFail);
+            st.phase = 'hq';
+            st.upgrading = false;
+            hqUpgradeCount--;
+            if (v.duration && Number.isFinite(v.duration)) {
+                v.currentTime = Math.min(Math.max(0, t), Math.max(0, v.duration - 0.05));
+            }
+            if (wasPlaying) tryPlayAdaptive(v);
+            scheduleHqUpgrades();
+        };
+        const onFail = () => {
+            v.removeEventListener('canplay', onDone);
+            v.removeEventListener('error', onFail);
+            st.upgrading = false;
+            hqUpgradeCount--;
+            stopHqRingLoad(v, st);
+            scheduleHqUpgrades();
+        };
+        v.addEventListener('canplay', onDone, { once: true });
+        v.addEventListener('error', onFail, { once: true });
+        v.src = st.hqUrl;
+        v.load();
+    }
+
+    function scheduleHqUpgrades() {
+        if (hqUpgradeCount >= MAX_CONCURRENT_HQ) return;
+        const candidates = [];
+        for (const v of adaptiveVideos) {
+            const st = adaptiveState.get(v);
+            if (!st || st.phase !== 'low' || st.upgrading || !st.inView || !st.lowUrl) continue;
+            candidates.push({ v, st, score: viewportCenterScore(v) });
+        }
+        candidates.sort((a, b) => b.score - a.score);
+        for (const { v, st } of candidates) {
+            if (hqUpgradeCount >= MAX_CONCURRENT_HQ) break;
+            if (st.phase !== 'low' || st.upgrading) continue;
+            startHqUpgrade(v, st);
+        }
+    }
+
+    const io = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+            const v = entry.target;
+            const st = adaptiveState.get(v);
+            if (!st) continue;
+            st.inView = entry.isIntersecting;
+            st.intersectionRatio = entry.intersectionRatio;
+            if (entry.isIntersecting) {
+                ensureLowOrHq(v, st);
+                scheduleHqUpgrades();
+            } else {
+                v.pause();
+            }
+        }
+    }, IO_OPTS);
+
+    function registerAdaptiveVideo(el) {
+        if (!el || el.tagName !== 'VIDEO' || adaptiveState.has(el)) return;
+        let hq =
+            el.dataset.adaptiveHq ||
+            el.getAttribute('data-adaptive-hq') ||
+            (el.querySelector('source') && el.querySelector('source').getAttribute('src'));
+        if (!hq) return;
+        el.innerHTML = '';
+        el.dataset.adaptiveHq = hq;
+        el.preload = 'none';
+        el.autoplay = false;
+        const st = {
+            hqUrl: hq,
+            lowUrl: toLowUrl(hq),
+            phase: 'idle',
+            upgrading: false,
+            inView: false,
+            intersectionRatio: 0,
+            ringSession: 0,
+            _ringInterval: null
+        };
+        adaptiveState.set(el, st);
+        adaptiveVideos.add(el);
+        io.observe(el);
+    }
+
+    document.querySelectorAll('video.video-adaptive').forEach(registerAdaptiveVideo);
+    SIM1.registerAdaptiveVideo = registerAdaptiveVideo;
+})();
+
 // ── Hero Video Player ──
 const demoVideo = document.getElementById('demoVideo');
 const demoWrapper = document.querySelector('.video-wrapper');
@@ -183,7 +484,7 @@ if (demoVideo && demoWrapper) {
     demoVideo.addEventListener('canplay', () => {
         heroCanPlay = true;
         tryHeroAutoplay();
-    }, { once: true });
+    });
 
     demoVideo.addEventListener('error', () => {
         heroPosterReady = true;
@@ -191,6 +492,8 @@ if (demoVideo && demoWrapper) {
         heroCanPlay = true;
         tryHeroAutoplay();
     });
+
+    SIM1.heroTryAutoplay = tryHeroAutoplay;
 
     const progressBar   = demoWrapper.querySelector('.progress-bar');
     const progressFilled = demoWrapper.querySelector('.progress-filled');
@@ -931,16 +1234,12 @@ console.log('Psi0 Website Loaded Successfully!');
             wrap.className = 'solver-vid-wrap zip-video-badge';
 
             const video = document.createElement('video');
-            video.autoplay = true;
+            video.classList.add('video-adaptive');
+            video.dataset.adaptiveHq = `videos/${folder}/zip_${i}.mp4`;
             video.loop = true;
             video.muted = true;
             video.playsInline = true;
-            video.preload = 'metadata';
-
-            const source = document.createElement('source');
-            source.src = `videos/${folder}/zip_${i}.mp4`;
-            source.type = 'video/mp4';
-            video.appendChild(source);
+            video.preload = 'none';
 
             const label = document.createElement('p');
             label.className = 'solver-label';
@@ -952,6 +1251,7 @@ console.log('Psi0 Website Loaded Successfully!');
             frag.appendChild(card);
         });
         reel.appendChild(frag);
+        reel.querySelectorAll('video.video-adaptive').forEach((v) => SIM1.registerAdaptiveVideo(v));
     }
 
     /** Full filenames under videos/{folder}/ — same card layout as zip reels, no zip badge. */
@@ -965,21 +1265,17 @@ console.log('Psi0 Website Loaded Successfully!');
             wrap.className = 'solver-vid-wrap';
 
             const video = document.createElement('video');
-            video.autoplay = true;
+            video.classList.add('video-adaptive');
+            video.dataset.adaptiveHq = `videos/${folder}/${name}`;
             video.loop = true;
             video.muted = true;
             video.playsInline = true;
-            video.preload = 'metadata';
+            video.preload = 'none';
             video.addEventListener('loadedmetadata', () => {
                 if (video.videoWidth && video.videoHeight) {
                     wrap.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
                 }
             });
-
-            const source = document.createElement('source');
-            source.src = `videos/${folder}/${name}`;
-            source.type = 'video/mp4';
-            video.appendChild(source);
 
             const label = document.createElement('p');
             label.className = 'solver-label';
@@ -991,6 +1287,7 @@ console.log('Psi0 Website Loaded Successfully!');
             frag.appendChild(card);
         });
         reel.appendChild(frag);
+        reel.querySelectorAll('video.video-adaptive').forEach((v) => SIM1.registerAdaptiveVideo(v));
     }
 
     // Order: zip_1 first, then zip (indices match files on disk).
