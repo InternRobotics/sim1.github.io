@@ -12,6 +12,7 @@
     --body-copy-width: 52rem;
     --media-copy-width: 56rem;
     --section-space-y: clamp(2rem, 4.8vw, 2rem);
+    --font-body-size: 1.0rem;
 
     --bg-primary: #000000;
     --bg-secondary: #0a0a0a;
@@ -90,7 +91,7 @@ body {
     color: var(--text-primary);
     line-height: 1.7;
     overflow-x: hidden;
-    font-size: 1.125rem; /* ~18px at 16px root */
+    font-size: var(--font-body-size); /* ~18px at 16px root */
 }
 
 /* Navigation */
@@ -1119,7 +1120,7 @@ body.theme-light .citation-copy-btn:hover {
     color: var(--text-secondary);
     max-width: var(--body-copy-width);
     margin: 0 auto var(--body-paragraph-gap);
-    font-size: 1.125rem;
+    font-size: var(--font-body-size);
     line-height: 1.78;
 }
 
@@ -1153,7 +1154,7 @@ body.theme-light .citation-copy-btn:hover {
 }
 
 .arch-description {
-    font-size: 1.125rem;
+    font-size: var(--font-body-size);
     color: var(--text-secondary);
     max-width: min(var(--body-copy-width), 92vw);
     margin: 0 auto var(--body-paragraph-gap);
@@ -1871,7 +1872,7 @@ body.theme-light .solver-nav-btn:hover {
 }
 
 .feedback-item p {
-    font-size: 1.125rem;
+    font-size: var(--font-body-size);
     color: var(--text-secondary);
 }
 
@@ -1893,7 +1894,7 @@ body.theme-light .solver-nav-btn:hover {
 }
 
 .method-text p {
-    font-size: 1.125rem;
+    font-size: var(--font-body-size);
     color: var(--text-secondary);
     line-height: 1.78;
     margin-bottom: var(--body-paragraph-gap);
@@ -1985,7 +1986,7 @@ body.theme-light .solver-nav-btn:hover {
 
 .method-card p {
     color: var(--text-secondary);
-    font-size: 1.125rem;
+    font-size: var(--font-body-size);
 }
 
 /* Charts */
@@ -2787,7 +2788,7 @@ body.theme-light .solver-compare-canvas-wrap--stable {
 }
 
 .highlight-text {
-    font-size: 1.125rem;
+    font-size: var(--font-body-size);
     opacity: 0.9;
     text-align: center;
     text-justify: auto;
@@ -3168,7 +3169,7 @@ body.theme-light .solver-compare-canvas-wrap--stable {
     font-optical-sizing: auto;
     font-feature-settings: 'kern' 1, 'liga' 1;
     text-rendering: optimizeLegibility;
-    font-size: 1.125rem;
+    font-size: var(--font-body-size);
     color: var(--text-secondary);
     line-height: 1.78;
     max-width: var(--body-copy-width);
