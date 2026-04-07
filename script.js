@@ -1425,3 +1425,22 @@ console.log('Psi0 Website Loaded Successfully!');
         initSolverReel(reelNovel, document.getElementById('resultsPrevNovel'), document.getElementById('resultsNextNovel'));
     }
 })();
+
+// Defer YouTube coverflow until Hero adaptive video can play (prioritize super-low MP4 bandwidth)
+(() => {
+    let done = false;
+    function startCoverflowYt() {
+        if (done) return;
+        done = true;
+        if (window.SIM1 && typeof SIM1.startCoverflowYoutube === 'function') {
+            SIM1.startCoverflowYoutube();
+        }
+    }
+    const demo = document.getElementById('demoVideo');
+    if (demo) {
+        demo.addEventListener('canplay', startCoverflowYt, { once: true });
+        window.setTimeout(startCoverflowYt, 14000);
+    } else {
+        window.setTimeout(startCoverflowYt, 0);
+    }
+})();

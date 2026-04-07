@@ -193,11 +193,17 @@
         });
     }
 
-    var hasYoutube = root.querySelector('.coverflow-yt');
-    if (hasYoutube) {
+    var ytInjected = false;
+
+    function injectYoutubeEmbeds() {
+        if (ytInjected) return;
+        ytInjected = true;
         slides.forEach(function (slide) {
             var iframe = slide.querySelector('.coverflow-yt');
-            if (!iframe || !iframe.src) return;
+            if (!iframe) return;
+            var ds = iframe.getAttribute('data-src');
+            if (ds) iframe.src = ds;
+            if (!iframe.src) return;
             try {
                 var u = new URL(iframe.src);
                 u.searchParams.set('origin', window.location.origin);
@@ -215,6 +221,20 @@
             tag.src = 'https://www.youtube.com/iframe_api';
             var firstScriptTag = document.getElementsByTagName('script')[0];
             firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        }
+    }
+
+    var hasYoutube = root.querySelector('.coverflow-yt');
+    if (hasYoutube) {
+        var probeYt = root.querySelector('.coverflow-yt');
+        var deferYt = !!(probeYt && probeYt.getAttribute('data-src') && !probeYt.src);
+
+        if (deferYt) {
+            window.SIM1 = window.SIM1 || {};
+            SIM1.startCoverflowYoutube = injectYoutubeEmbeds;
+            applyLayout();
+        } else {
+            injectYoutubeEmbeds();
         }
     } else {
         bindNativeVideos();
