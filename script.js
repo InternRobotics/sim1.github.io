@@ -194,8 +194,8 @@ SIM1.heroTryAutoplay = () => {};
         return Math.min(1, end / v.duration);
     }
 
-    /** Off-DOM preload so current tier keeps playing until next tier is buffered. */
-    function preloadVideoUrl(url, onReady, onError) {
+    /** Off-DOM preload so current tier keeps playing until next tier is buffered. `onReady(preloadEl)`. */
+    function preloadVideoUrl(url, onReady, onError, ringOpts) {
         let settled = false;
         const p = document.createElement('video');
         p.muted = true;
@@ -206,11 +206,14 @@ SIM1.heroTryAutoplay = () => {};
         p.src = url;
         document.body.appendChild(p);
         p.load();
+        if (ringOpts && ringOpts.mainVideo && ringOpts.st) {
+            startTierRingLoad(ringOpts.mainVideo, ringOpts.st, p);
+        }
         const finishOk = () => {
             if (settled) return;
             settled = true;
+            onReady(p);
             if (p.parentNode) p.parentNode.removeChild(p);
-            onReady();
         };
         const finishErr = () => {
             if (settled) return;
@@ -253,10 +256,14 @@ SIM1.heroTryAutoplay = () => {};
         freezeCurrentFrameAsPoster(v);
         v.src = url;
         v.load();
+        if (st._ringProgressEl && st._ringProgressEl !== v) {
+            retargetTierRingProgress(v, st, v);
+        }
         let applied = false;
         const apply = () => {
             if (applied) return;
             applied = true;
+            stopHqRingLoad(v, st);
             v.removeEventListener('canplaythrough', onCap);
             v.removeEventListener('canplay', onCp);
             v.removeEventListener('error', onErr);
@@ -275,6 +282,7 @@ SIM1.heroTryAutoplay = () => {};
         const onErr = () => {
             if (applied) return;
             applied = true;
+            stopHqRingLoad(v, st);
             v.removeEventListener('canplaythrough', onCap);
             v.removeEventListener('canplay', onCp);
             v.removeEventListener('error', onErr);
@@ -308,13 +316,15 @@ SIM1.heroTryAutoplay = () => {};
         hqRingMeta.set(v, { wrap, prog, circumference });
     }
 
-    function updateHqRingProgress(v) {
-        const m = hqRingMeta.get(v);
-        if (!m || !m.wrap.classList.contains('is-visible')) return;
-        const dur = v.duration;
+    function updateTierRingProgress(mediaEl) {
+        const owner = mediaEl._tierRingOwner != null ? mediaEl._tierRingOwner : mediaEl;
+        const m = hqRingMeta.get(owner);
+        if (!m) return;
+        if (!m.wrap.classList.contains('is-visible')) return;
+        const dur = mediaEl.duration;
         let frac = 0;
         if (dur && Number.isFinite(dur) && dur > 0) {
-            frac = bufferedFraction(v);
+            frac = bufferedFraction(mediaEl);
         }
         m.prog.style.strokeDashoffset = String(m.circumference * (1 - frac));
         m.wrap.classList.toggle('video-hq-ring--pulse', frac < 0.02 && !(dur && dur > 0));
@@ -322,18 +332,20 @@ SIM1.heroTryAutoplay = () => {};
 
     function stopHqRingLoad(v, st) {
         if (!st) return;
+        const srcEl = st._ringProgressEl || v;
         if (st._ringOnProg) {
-            v.removeEventListener('progress', st._ringOnProg);
+            srcEl.removeEventListener('progress', st._ringOnProg);
             st._ringOnProg = null;
         }
         if (st._ringOnCap) {
-            v.removeEventListener('canplaythrough', st._ringOnCap);
+            srcEl.removeEventListener('canplaythrough', st._ringOnCap);
             st._ringOnCap = null;
         }
         if (st._ringInterval) {
             clearInterval(st._ringInterval);
             st._ringInterval = null;
         }
+        st._ringProgressEl = null;
         st.ringSession = (st.ringSession || 0) + 1;
         const m = hqRingMeta.get(v);
         if (m) {
@@ -341,51 +353,66 @@ SIM1.heroTryAutoplay = () => {};
         }
     }
 
-    /** Show ring + track buffer until canplaythrough or ~full buffer. */
-    function startHqRingLoad(v, st) {
+    /** Ring tracks `progressSource` (preload element or main &lt;video&gt;). `v` = main video for DOM placement. */
+    function startTierRingLoad(v, st, progressSource) {
+        const ps = progressSource || v;
         stopHqRingLoad(v, st);
         attachHqRing(v);
         const m = hqRingMeta.get(v);
         if (!m) return;
+        ps._tierRingOwner = v;
+        st._ringProgressEl = ps;
         const sid = st.ringSession;
         m.wrap.classList.add('is-visible');
-        updateHqRingProgress(v);
+        updateTierRingProgress(ps);
 
         const cleanup = () => {
             if (st.ringSession !== sid) return;
+            const el = st._ringProgressEl || v;
             if (st._ringOnProg) {
-                v.removeEventListener('progress', st._ringOnProg);
+                el.removeEventListener('progress', st._ringOnProg);
                 st._ringOnProg = null;
             }
             if (st._ringOnCap) {
-                v.removeEventListener('canplaythrough', st._ringOnCap);
+                el.removeEventListener('canplaythrough', st._ringOnCap);
                 st._ringOnCap = null;
             }
             if (st._ringInterval) {
                 clearInterval(st._ringInterval);
                 st._ringInterval = null;
             }
+            st._ringProgressEl = null;
+            if (el && el._tierRingOwner === v) delete el._tierRingOwner;
             m.wrap.classList.remove('is-visible', 'video-hq-ring--pulse');
         };
 
         const onProg = () => {
             if (st.ringSession !== sid) return;
-            updateHqRingProgress(v);
-            if (bufferedFraction(v) >= 0.992) cleanup();
+            const el = st._ringProgressEl || v;
+            updateTierRingProgress(el);
         };
 
-        const onCap = () => cleanup();
-
         st._ringOnProg = onProg;
-        st._ringOnCap = onCap;
-        v.addEventListener('progress', onProg);
-        v.addEventListener('canplaythrough', onCap, { once: true });
+        st._ringOnCap = null;
+        ps.addEventListener('progress', onProg);
         st._ringInterval = window.setInterval(() => {
             onProg();
         }, 280);
         window.setTimeout(() => {
             if (st.ringSession === sid) cleanup();
         }, 120000);
+    }
+
+    function retargetTierRingProgress(v, st, newSource) {
+        const old = st._ringProgressEl || v;
+        if (old && old._tierRingOwner === v) delete old._tierRingOwner;
+        newSource._tierRingOwner = v;
+        if (st._ringOnProg) {
+            old.removeEventListener('progress', st._ringOnProg);
+            newSource.addEventListener('progress', st._ringOnProg);
+        }
+        st._ringProgressEl = newSource;
+        updateTierRingProgress(newSource);
     }
 
     function tryPlayAdaptive(v) {
@@ -402,9 +429,9 @@ SIM1.heroTryAutoplay = () => {};
             st.hqUrl,
             () => {
                 freezeCurrentFrameAsPoster(v);
-                startHqRingLoad(v, st);
                 v.src = st.hqUrl;
                 v.load();
+                retargetTierRingProgress(v, st, v);
                 let applied = false;
                 const apply = () => {
                     if (applied) return;
@@ -427,7 +454,8 @@ SIM1.heroTryAutoplay = () => {};
             () => {
                 st.phase = 'idle';
                 stopHqRingLoad(v, st);
-            }
+            },
+            { mainVideo: v, st: st }
         );
     }
 
@@ -448,7 +476,11 @@ SIM1.heroTryAutoplay = () => {};
                         () => loadHqFallback(v, st)
                     );
                 },
-                () => loadHqFallback(v, st)
+                () => {
+                    stopHqRingLoad(v, st);
+                    loadHqFallback(v, st);
+                },
+                { mainVideo: v, st: st }
             );
         } else {
             loadHqFallback(v, st);
@@ -511,6 +543,7 @@ SIM1.heroTryAutoplay = () => {};
         const savedTime = v.currentTime;
         const wasPlaying = !v.paused;
         const handleLowTierFail = () => {
+            stopHqRingLoad(v, st);
             st.upgradingLow = false;
             lowUpgradeCount--;
             if (st.hqUrl) {
@@ -537,7 +570,8 @@ SIM1.heroTryAutoplay = () => {};
                     handleLowTierFail
                 );
             },
-            handleLowTierFail
+            handleLowTierFail,
+            { mainVideo: v, st: st }
         );
     }
 
@@ -550,9 +584,9 @@ SIM1.heroTryAutoplay = () => {};
             st.hqUrl,
             () => {
                 freezeCurrentFrameAsPoster(v);
-                startHqRingLoad(v, st);
                 v.src = st.hqUrl;
                 v.load();
+                retargetTierRingProgress(v, st, v);
                 let applied = false;
                 const apply = () => {
                     if (applied) return;
@@ -587,8 +621,10 @@ SIM1.heroTryAutoplay = () => {};
             () => {
                 st.upgrading = false;
                 hqUpgradeCount--;
+                stopHqRingLoad(v, st);
                 scheduleHqUpgrades();
-            }
+            },
+            { mainVideo: v, st: st }
         );
     }
 
@@ -626,9 +662,9 @@ SIM1.heroTryAutoplay = () => {};
             st.hqUrl,
             () => {
                 freezeCurrentFrameAsPoster(v);
-                startHqRingLoad(v, st);
                 v.src = st.hqUrl;
                 v.load();
+                retargetTierRingProgress(v, st, v);
                 let applied = false;
                 const apply = () => {
                     if (applied) return;
@@ -650,7 +686,8 @@ SIM1.heroTryAutoplay = () => {};
                 }, { once: true });
                 v.addEventListener('error', onFail, { once: true });
             },
-            onFail
+            onFail,
+            { mainVideo: v, st: st }
         );
     }
 
