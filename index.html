@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIM1 | Intern Robotics</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5">
+    <link rel="shortcut icon" href="favicon.svg?v=5">
+    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <!-- Scroll Progress Bar -->
+    <div class="scroll-progress"></div>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <ul class="nav-links">
+                <li><a href="#introduction">Story</a></li>
+                <li><a href="#methodology">Pipeline</a></li>
+                <li><a href="#solver-compare">Physics</a></li>
+                <li><a href="#trajectory-gen">Data</a></li>
+                <li><a href="#pca-viz">Action Space</a></li>
+                <li><a href="#results">Results</a></li>
+                <li><a href="#citation">Citation</a></li>
+                <li><a class="nav-demo-btn" href="#demo">Demo</a></li>
+            </ul>
+            <button type="button" class="theme-toggle-btn" id="themeToggleBtn" aria-label="Switch theme" aria-pressed="false">
+                <span class="theme-toggle-icon theme-toggle-icon--moon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+                    </svg>
+                </span>
+                <span class="theme-toggle-icon theme-toggle-icon--sun" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="4"/>
+                        <path d="M12 2v2.2M12 19.8V22M4.93 4.93l1.56 1.56M17.51 17.51l1.56 1.56M2 12h2.2M19.8 12H22M4.93 19.07l1.56-1.56M17.51 6.49l1.56-1.56"/>
+                    </svg>
+                </span>
+                <span class="theme-toggle-text">Night</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-title-interactive" tabindex="0" aria-label="Paper title; hover or focus to see all authors">
+                <h1 class="hero-title">
+                    <span class="title-name-wrap">
+                        <canvas class="title-fx-canvas" id="heroTitleFx" aria-hidden="true"></canvas>
+                        <span class="title-name">SIM1</span>
+                    </span>
+                    <span class="title-desc">Physics-Aligned Simulator as Zero-Shot Data Scaler in Deformable Worlds</span>
+                </h1>
+                <div
+                    class="hero-authors-popover"
+                    id="heroAuthorsPanel"
+                    role="region"
+                    aria-label="Authors and affiliations"
+                >
+                    <p class="hero-authors-legend">
+                        <span class="hero-authors-legend-i">*</span> Equal contribution
+                        <span class="hero-authors-sep" aria-hidden="true">·</span>
+                        <span class="hero-authors-legend-i">†</span> Corresponding author
+                    </p>
+                    <ul class="hero-authors-list">
+                        <li>Yunsong Zhou <span class="hero-author-marks"><sup>*</sup><sup>†</sup><sup>1</sup></span></li>
+                        <li>Hangxu Liu <span class="hero-author-marks"><sup>*</sup><sup>1</sup><sup>2</sup></span></li>
+                        <li>Xuekun Jiang <span class="hero-author-marks"><sup>*</sup><sup>1</sup></span></li>
+                        <li>Xing Shen <span class="hero-author-marks"><sup>*</sup><sup>1</sup></span></li>
+                        <li>Yuanzhen Zhou <span class="hero-author-marks"><sup>1</sup></span></li>
+                        <li>Hui Wang <span class="hero-author-marks"><sup>1</sup><sup>3</sup></span></li>
+                        <li>Baole Fang <span class="hero-author-marks"><sup>1</sup></span></li>
+                        <li>Yang Tian <span class="hero-author-marks"><sup>1</sup><sup>4</sup></span></li>
+                        <li>Mulin Yu <span class="hero-author-marks"><sup>1</sup></span></li>
+                        <li>Qiaojun Yu <span class="hero-author-marks"><sup>1</sup></span></li>
+                        <li>Li Ma <span class="hero-author-marks"><sup>1</sup></span></li>
+                        <li>Hengjie Li <span class="hero-author-marks"><sup>1</sup></span></li>
+                        <li>Hanqing Wang <span class="hero-author-marks"><sup>1</sup></span></li>
+                        <li>Jia Zeng <span class="hero-author-marks"><sup>1</sup></span></li>
+                        <li>Jiangmiao Pang <span class="hero-author-marks"><sup>†</sup><sup>1</sup></span></li>
+                    </ul>
+                    <div class="hero-affil-block">
+                        <p><sup>1</sup> Shanghai AI Lab</p>
+                        <p><sup>2</sup> Fudan University</p>
+                        <p><sup>3</sup> Shanghai Jiao Tong University</p>
+                        <p><sup>4</sup> Peking University</p>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-meta">
+                <div class="meta-item">
+                    <span class="meta-label">Published</span>
+                    <span class="meta-link">April 9, 2026</span>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Report</span>
+                    <a href="https://arxiv.org/abs/2604.04562" class="meta-link">2604.04562</a>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Repository</span>
+                    <a href="https://github.com/InternRobotics/SIM1" class="meta-link">SIM1</a>
+                </div>
+                <div class="meta-item">
+                    <span class="meta-label">Email</span>
+                    <a href="mailto:zhouyunsong2017@gmail.com" class="meta-link">[InternRobotics]</a>
+                </div>
+            </div>
+        </div>
+        <div class="video-container">
+            <div class="video-wrapper">
+                <video id="demoVideo" class="demo-video" autoplay muted loop playsinline>
+                    <source src="videos/real2sim2real.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <!-- Center play/pause overlay -->
+                <button class="vid-center-btn play-pause-btn" aria-label="Play/Pause">
+                    <span class="play-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+                    <span class="pause-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></span>
+                </button>
+                <!-- Bottom control bar -->
+                <div class="video-controls">
+                    <div class="progress-bar"><div class="progress-filled"></div></div>
+                    <div class="vid-bar">
+                        <div class="vid-left">
+                            <button class="vid-btn play-pause-btn" aria-label="Play/Pause">
+                                <span class="play-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
+                                <span class="pause-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></span>
+                            </button>
+                            <span class="vid-time"><span class="current-time">0:00</span> / <span class="duration">0:00</span></span>
+                        </div>
+                        <div class="vid-right">
+                            <button class="vid-btn fullscreen-btn" aria-label="Fullscreen">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Introduction -->
+    <section id="introduction" class="section">
+        <div class="container">
+            <h2 class="section-title">SIM1: The Same One as Reality</h2>
+            <div class="architecture-content">
+                <blockquote class="arch-quote">
+                    <p>"What I cannot create, I do not understand."</p>
+                    <cite>Richard Feynman</cite>
+                </blockquote>
+                <p class="arch-description">
+                    Robotics is advancing at astonishing speed. Machines now sort parcels at warehouse tempo, weld with micron-level precision, and assist in surgery with superhuman steadiness. Yet give that same robot a wrinkled shirt and ask it to fold, and the illusion breaks. Cloth is not just another object category. It is a moving state space. Every grasp reshapes the surface. Every pull rewrites the geometry. Every contact changes what happens next. Compared with rigid manipulation, deformable tasks demand vastly broader coverage of states, recoveries, and interaction modes, making them among the most data-hungry problems in all of robotics.
+                </p>
+                <p class="arch-description">
+                    That is exactly where the field hits a wall. Robot foundation models such as π<sub>0</sub> have already shown the core scaling law: more demonstrations unlock more capability. But cloth needs <em>far more</em> data than pick-and-place or rigid assembly, because success depends on seeing not one canonical pose, but thousands of messy, partially folded, self-occluded, failure-prone configurations. Collecting that data in the real world is brutally expensive: expert operators, costly hardware, and roughly 100 trajectories per day. The moment you ask for the volume required for robust generalization, the economics collapse.
+                </p>
+                <p class="arch-description">
+                    In principle, simulation should be the escape hatch. Run forever, scale cheaply, generate trajectories by the million. And indeed, simulation-driven data generation has shown promise for rigid-object manipulation. But cloth has remained the exception. Prior attempts break on exactly the dimensions that matter most for deformables: geometry that drifts from reality, contact and friction that destabilize long-horizon behavior, and robot motions that no longer resemble the structure of human demonstrations. The result is a frustrating compromise the community has learned to live with: <em>use simulation to help, but trust real data when it counts.</em>
+                </p>
+                <!-- Kai0-style 3-task coverflow (distinct from horizontal phy gallery below) -->
+                <div class="kai-task-reel" id="kaiTaskReel" aria-label="Three long-horizon task videos">
+                    <p class="kai-task-lead section-desc">
+                        One simulation, spanning multiple tasks and scenes: these 20× replays summarize <strong>45 hours</strong> of generated trajectories from <strong>SIM1</strong>, with physically credible cloth dynamics at scale.
+                    </p>
+                    <div class="coverflow-scene">
+                        <div class="coverflow-viewport">
+                            <div class="coverflow-track" id="coverflowTrack" role="list">
+                                <article class="coverflow-slide pos-center" data-index="0" role="listitem">
+                                    <div class="coverflow-frame">
+                                        <video class="coverflow-vid" muted playsinline preload="metadata">
+                                            <source src="videos/data_video/zip_1.mp4" type="video/mp4">
+                                        </video>
+                                        <span class="coverflow-speed-badge">20× Speed</span>
+                                    </div>
+                                </article>
+                                <article class="coverflow-slide pos-right" data-index="1" role="listitem">
+                                    <div class="coverflow-frame">
+                                        <video class="coverflow-vid" muted playsinline preload="metadata">
+                                            <source src="videos/data_video/zip_10.mp4" type="video/mp4">
+                                        </video>
+                                        <span class="coverflow-speed-badge">20× Speed</span>
+                                    </div>
+                                </article>
+                                <article class="coverflow-slide pos-left" data-index="2" role="listitem">
+                                    <div class="coverflow-frame">
+                                        <video class="coverflow-vid" muted playsinline preload="metadata">
+                                            <source src="videos/data_video/zip_3.mp4" type="video/mp4">
+                                        </video>
+                                        <span class="coverflow-speed-badge">20× Speed</span>
+                                    </div>
+                                </article>
+                            </div>
+                            <div class="coverflow-hits">
+                                <button type="button" class="coverflow-hit coverflow-hit-left" id="coverflowHitLeft" aria-label="Previous task"></button>
+                                <button type="button" class="coverflow-hit coverflow-hit-right" id="coverflowHitRight" aria-label="Next task"></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p class="arch-description">
+                    <strong>SIM1</strong> begins by rejecting that compromise. Our premise is not that synthetic data should be cheaper; it is that synthetic data must become <em>faithful</em>. When the simulator is geometrically precise, dynamically stable, and behaviorally aligned with real demonstrations, simulation stops being a rough pre-training proxy and becomes a real source of supervision. That is the idea behind SIM1: close the loop between human demonstrations and high-fidelity cloth simulation tightly enough that generated trajectories can serve as a direct, zero-shot substitute for real-world data.
+                </p>
+                <p class="arch-description">
+                    From just 200 human demonstrations, SIM1 produces over 10,000 synthetic trajectories at <strong>27× lower cost</strong> and <strong>6.8× higher throughput</strong>. Policies trained entirely on this synthetic data achieve <strong>90% zero-shot success</strong> on real robots — and outperform real-data baselines by over <strong>50%</strong> when the environment changes. For cloth manipulation, this is the turning point: simulation is no longer a warm-up. It is the engine.
+                </p>
+            </div>
+
+            
+        </div>
+    </section>
+
+    <!-- Methodology -->
+    <section id="methodology" class="section section-dark">
+        <div class="container">
+            <h2 class="section-title">Scan It, Simulate It, Scale It</h2>
+            
+            <div class="methodology-content">
+                <div class="method-text">
+                    <h3 class="subsection-title">Three Bridges Between Virtual and Real</h3>
+                    <p>
+                        The gap between simulation and reality isn't one problem — it's three. The scene <em>looks</em> wrong. The physics <em>feel</em> wrong. The motions <em>act</em> wrong. SIM1 closes all three with a unified real-to-sim-to-real pipeline.
+                    </p>
+                    <p>
+                        First, we make the virtual world <em>look</em> like the real one. Real garments are laser-scanned at sub-millimeter resolution, producing digital twins so precise they preserve individual wrinkles and texture weave. The robot, the table, the lighting — everything is reconstructed or imported at true-to-life scale. This isn't approximate modeling. It's digital forensics.
+                    </p>
+                    <p>
+                        Second, we make the virtual world <em>feel</em> like the real one. Our custom physics solver ensures that when a simulated robot pulls cloth, the fabric drapes, stretches, and resists exactly as it would on a physical table. We calibrate by running identical motions on the real and simulated robot simultaneously, then tuning parameters until the two are visually indistinguishable.
+                    </p>
+                    <p>
+                        Third, we make the virtual robot <em>act</em> like a real one. Rather than scripting rigid pick-and-place sequences, we teach a diffusion model to generate fluid, human-like trajectories. A learned quality filter discards the rare implausible motion, and visual randomization — different materials, lighting, camera angles — ensures that trained policies can't memorize appearances. The result is a data engine that converts a weekend of human demonstration into months of diverse, photorealistic training data.
+                    </p>
+                </div>
+                
+                <div class="method-video">
+                    <div class="method-video-wrapper">
+                        <video id="methodVideo" class="method-video-element" autoplay loop muted playsinline>
+                            <source src="videos/pipeline.mp4" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                    <p class="method-video-note solver-compare-note">
+                        The pipeline begins with real garments and teleoperated demonstrations, reconstructs them into a high-fidelity simulation, generates large-scale synthetic trajectories with aligned physics and behavior, and finally trains policies that transfer <strong>zero-shot</strong> back to physical robots.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Solver comparison: naive VBD vs deformation-stable -->
+    <section id="solver-compare" class="section section-dark">
+        <div class="container">
+            <h2 class="section-title">Teaching Simulators to Respect Cloth</h2>
+            <p class="section-desc">
+                Pull a real shirt from one corner, and the entire fabric responds instantly — ripples propagate, folds cascade, the cloth moves as one connected surface. Existing physics engines can't reproduce this in real time. Forces travel too slowly through the mesh, particles lag behind the gripper, and the result is a jittery, stretchy mess that looks nothing like real fabric. This is why sim-to-real for cloth has remained a pipe dream.
+            </p>
+            <p class="section-desc">
+                <strong>SIM1</strong>'s solver fixes this with an elegant idea: give the cloth a <em>nervous system</em>. Whenever any mesh edge stretches beyond a physical threshold, a corrective spring instantly activates and snaps the fabric back into shape. When one part is pulled, the correction signal races across the entire surface within a single simulation step. The <strong>naive VBD</strong> solver (left) produces chaotic, localized deformation. Our <strong>deformation-stable</strong> solver (right) keeps the mesh coherent and physically plausible. Drag the particles yourself to feel the difference.
+            </p>
+            <div class="solver-compare-toolbar">
+                <button type="button" id="solverCompareDragMode" class="solver-compare-drag" aria-pressed="false">
+                    Drag particles
+                </button>
+                <button type="button" id="solverCompareReset" class="solver-compare-reset">Reset both</button>
+                <span class="solver-compare-reset-hint" aria-hidden="true">Auto-reset every 10s</span>
+            </div>
+            <div class="solver-compare-grid">
+                <figure class="solver-compare-card">
+                    <figcaption class="solver-compare-label">
+                        <span class="solver-compare-label-title">Naive VBD</span>
+                        <span class="solver-compare-label-tag">slow global propagation</span>
+                    </figcaption>
+                    <div class="solver-compare-canvas-wrap" aria-hidden="true">
+                        <canvas id="solverCanvasNaive" aria-label="Naive VBD particle cloth: few weak constraint iterations per frame"></canvas>
+                    </div>
+                    <p class="solver-compare-note">
+                        Few, weak global passes—the mesh lags: distant particles respond only after many frames.
+                    </p>
+                </figure>
+                <figure class="solver-compare-card solver-compare-card--stable">
+                    <figcaption class="solver-compare-label">
+                        <span class="solver-compare-label-title">Deformation-stable</span>
+                        <span class="solver-compare-label-tag solver-compare-label-tag--accent">adaptive edge coupling</span>
+                    </figcaption>
+                    <div class="solver-compare-canvas-wrap solver-compare-canvas-wrap--stable" aria-hidden="true">
+                        <canvas id="solverCanvasStable" aria-label="Deformation-stable cloth: strain-gated local stiffening"></canvas>
+                    </div>
+                    <p class="solver-compare-note">
+                        Strain-gated switches (<span class="solver-compare-label-tag solver-compare-label-tag--accent">warm dots</span> on edges) engage extra local projections—deformation equilibrates fast.
+                    </p>
+                </figure>
+            </div>
+        </div>
+        <p class="section-desc">
+            The interactive comparison above shows <em>why</em> the solver matters; the gallery below shows <em>what that fidelity buys us</em>. SIM1 reproduces deformable motion with convincing realism across twisting, fluttering, folding, and impact, while remaining stable under <strong>rigid-deformable contact</strong>. Even during aggressive gripper interaction, the cloth stays coherent and the contact remains <strong>penetration-free</strong>.
+        </p>
+        <div class="solver-gallery">
+            <div class="solver-reel" id="solverReel">
+                <div class="solver-card">
+                    <div class="solver-vid-wrap">
+                        <video autoplay loop muted playsinline>
+                            <source src="videos/phy_0.mp4" type="video/mp4">
+                        </video>
+                    </div>
+                    <p class="solver-label">Garment Twisting</p>
+                </div>
+                <div class="solver-card">
+                    <div class="solver-vid-wrap">
+                        <video autoplay loop muted playsinline>
+                            <source src="videos/phy_1.mp4" type="video/mp4">
+                        </video>
+                    </div>
+                    <p class="solver-label">Wind-Blown Garment</p>
+                </div>
+                <div class="solver-card">
+                    <div class="solver-vid-wrap">
+                        <video autoplay loop muted playsinline>
+                            <source src="videos/phy_2.mp4" type="video/mp4">
+                        </video>
+                    </div>
+                    <p class="solver-label">Garment Grasping (No Penetration)</p>
+                </div>
+                <div class="solver-card">
+                    <div class="solver-vid-wrap">
+                        <video autoplay loop muted playsinline>
+                            <source src="videos/phy_3.mp4" type="video/mp4">
+                        </video>
+                    </div>
+                    <p class="solver-label">Paper Folding</p>
+                </div>
+                <div class="solver-card">
+                    <div class="solver-vid-wrap">
+                        <video autoplay loop muted playsinline>
+                            <source src="videos/phy_4.mp4" type="video/mp4">
+                        </video>
+                    </div>
+                    <p class="solver-label">Multi-Layer Cloth Drop</p>
+                </div>
+                <div class="solver-card">
+                    <div class="solver-vid-wrap">
+                        <video autoplay loop muted playsinline>
+                            <source src="videos/phy_5.mp4" type="video/mp4">
+                        </video>
+                    </div>
+                    <p class="solver-label">Cloth Falling onto Spheres</p>
+                </div>
+            </div>
+        </div>
+        <div class="solver-nav-row">
+            <button class="solver-nav-btn solver-nav-prev" id="solverPrev" aria-label="Previous">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="solver-nav-btn solver-nav-next" id="solverNext" aria-label="Next">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+        <p class="section-desc">
+            Together, these examples mark the difference between an approximate cloth animation and a solver that can actually support learning. SIM1 does not just make deformables look plausible in isolation; it preserves the contact, stability, and non-penetrating interaction patterns that policies must rely on before they ever touch a real robot.
+        </p>
+    </section>
+
+    <!-- Trajectory generation (simulation streams → stitched generation) -->
+    <section id="trajectory-gen" class="section section-dark trajectory-section">
+        <div class="container">
+            <h2 class="section-title">A Data Factory, Not a Data Collection</h2>
+            <p class="section-desc">
+                Collecting robot data the traditional way is artisanal — one skilled operator, one demonstration at a time, one task per session. SIM1 turns this craft into manufacturing.
+            </p>
+            <p class="section-desc">
+                From 200 teleoperated demonstrations, we extract the essential <em>vocabulary</em> of manipulation: grasps, lifts, folds, releases. These atomic <strong>interactions</strong> are preserved exactly as the human performed them — they're too delicate to synthesize. The creative work — deciding how to connect one action to the next — is handled by a diffusion model that generates smooth, natural-looking <strong>transitions</strong>. The pipeline assembles these fragments into complete, novel trajectories that have never been performed but are physically valid. Each is rendered with randomized materials, lighting, and camera angles. The left panel shows raw traces from human demonstrations; the right shows one of thousands of synthesized trajectories — the data factory at work.
+            </p>
+            <div class="trajectory-grid">
+                <figure class="trajectory-card">
+                    <figcaption class="trajectory-card-title">Simulation joint traces (A, B, C)</figcaption>
+                    <div class="trajectory-canvas-wrap trajectory-canvas-wrap--source">
+                        <canvas id="trajSourceCanvas" width="400" height="320" aria-label="Simulation streams with segment cuts"></canvas>
+                    </div>
+                    <p class="trajectory-card-note">Solid / dashed lines: streams. Cut points: interacting poses; longer segments: moving segments.</p>
+                </figure>
+                <figure class="trajectory-card">
+                    <figcaption class="trajectory-card-title">Generated trajectories (one highlighted, many possible)</figcaption>
+                    <div class="trajectory-canvas-wrap trajectory-canvas-wrap--gen">
+                        <canvas id="trajGenCanvas" width="400" height="320" aria-label="One highlighted trajectory among many samples from the same pipeline"></canvas>
+                    </div>
+                    <p class="trajectory-card-note">Bright curve and dots: the highlighted trajectory instance. Faint curves: other valid samples from the same stitching and gap-fill procedure. The pipeline scales to arbitrarily many trajectories.</p>
+                </figure>
+            </div>
+            <p class="section-desc">From the same interaction vocabulary, SIM1 can assemble many distinct long-horizon rollouts, preserving task structure while expanding coverage far beyond what a human operator could manually record.</p>
+        </div>
+    </section>
+
+    <!-- Interactive 3D PCA (three data groups) -->
+    <section id="pca-viz" class="section section-dark pca-viz-section">
+        <div class="container">
+            <h2 class="section-title">Does Synthetic Data Look Real?</h2>
+            <p class="section-desc">
+                A synthetic dataset is only useful if the actions it teaches actually resemble what a real human operator would do. To find out, we project every robot action — from <strong>real demonstrations</strong>, <strong>teleoperated simulation</strong>, and <strong>SIM1's generated data</strong> — into a shared 3D space. The result speaks for itself: SIM1's synthetic actions don't just overlap with real demonstrations — they surround and extend them, covering a richer manifold of behaviors while staying firmly grounded in the same distribution. This isn't noise being mistaken for data. It's genuine manipulation skill, manufactured at scale. Drag to rotate, scroll to zoom.
+            </p>
+            <div class="pca-scatter-stage">
+                <div class="pca-scatter-view-wrap">
+                    <div id="pcaScatter3d" class="pca-scatter-canvas pca-scatter-canvas--loading" aria-label="Interactive 3D PCA scatter plot"></div>
+                </div>
+                <div class="pca-scatter-footer">
+                    <div class="pca-scatter-legend" id="pcaScatterLegend"></div>
+                    <p class="pca-scatter-hint">
+                        Click and drag to rotate · scroll to zoom.
+                        <span class="pca-scatter-hint-sub">Colors match the success-rate legend. Tooltip: PCA scores + source. PC1→X, PC2→Y, PC3→Z (Y-up).</span>
+                    </p>
+                </div>
+            </div>
+            <p class="section-desc">
+                In other words, SIM1 does not generate actions that merely look plausible in isolation. It produces trajectories that remain anchored to the same behavioral structure as real demonstrations, while broadening the coverage needed for robust policy learning.
+            </p>
+        </div>
+    </section>
+
+    <!-- Bottom Line -->
+    <section class="section highlight-section">
+        <div class="container">
+            <blockquote class="quote">
+                <p>"When simulation becomes faithful enough, real data no longer has to carry the full burden of learning."</p>
+            </blockquote>
+            <p class="highlight-text">15 synthetic trajectories ≈ 1 real demo · 27× cheaper · 6.8× faster · 90% zero-shot on real robots</p>
+        </div>
+    </section>
+
+    <!-- Results -->
+    <section id="results" class="section">
+        <div class="container">
+            <h2 class="section-title">Seeing Is Believing</h2>
+            <p class="section-desc">
+                The central question is simple: can simulation-trained policies really replace real-data training for deformable manipulation? We answer this from three angles at once: <em>matched-budget transfer</em>, <em>robustness under distribution shift</em>, and <em>how performance scales as more synthetic data is generated</em>.
+            </p>
+            <p class="section-desc">
+                Under equal budgets, simulation already comes surprisingly close to real-world supervision. In the representative π<sub>0.5</sub> setting, <strong>200</strong> real demonstrations reach <strong>97%</strong> success, while the corresponding simulation-trained policy reaches <strong>87%</strong>, leaving only a <strong>10-point gap</strong>. Once the environment changes, however, the picture flips: in spatial, texture, and lighting shifts, simulation-trained policies consistently hold up better because SIM1 exposes the model to variation that limited real collection cannot cover.
+            </p>
+            <p class="section-desc">
+                The strongest sanity check comes from training π<sub>0.5</sub> from scratch. Real data alone collapses to <strong>0%</strong> success, while SIM1's synthetic data alone reaches <strong>76%</strong>. That result is important: it shows the gain is not merely inherited from pretrained priors. It comes from the data distribution itself.
+            </p>
+            <p class="section-desc">
+                The bar summary below makes this comparison explicit across model scales and evaluation settings. It shows that simulation is already competitive in-domain under matched budgets, and becomes decisively stronger once robustness matters.
+            </p>
+            <div class="results-bar-section">
+                <div class="results-bar-header">
+                    <h3 class="subsection-title">Success Rate</h3>
+                </div>
+                <div class="results-bar-legend" aria-label="Legend">
+                    <div class="bar-legend-item"><span class="bar-legend-swatch swatch-real"></span><span>Real Data</span></div>
+                    <div class="bar-legend-item"><span class="bar-legend-swatch swatch-tele"></span><span>Sim Teleoperated Data</span></div>
+                    <div class="bar-legend-item"><span class="bar-legend-swatch swatch-gen"></span><span>Sim Generated Data</span></div>
+                </div>
+                <div class="results-bar-panels">
+                    <div class="results-bar-panel results-bar-panel--small">
+                        <div class="results-bar-panel-title">π0.5 (scratch)</div>
+                        <div id="results-bar-chart-scratch" class="results-bar-chart" aria-label="Bar chart π0.5 from scratch"></div>
+                    </div>
+                    <div class="results-bar-panel results-bar-panel--large">
+                        <div class="results-bar-panel-title">π0.5</div>
+                        <div id="results-bar-chart-pi05" class="results-bar-chart" aria-label="Bar chart π0.5"></div>
+                    </div>
+                    <div class="results-bar-panel results-bar-panel--large">
+                        <div class="results-bar-panel-title">π0</div>
+                        <div id="results-bar-chart-pi0" class="results-bar-chart" aria-label="Bar chart π0"></div>
+                    </div>
+                </div>
+                <div id="results-bar-tooltip" class="results-bar-tooltip" role="tooltip" aria-hidden="true"></div>
+            </div>
+            <p class="section-desc">
+                The next question is not just <em>whether</em> synthetic data works, but <em>how it scales</em>. The two scaling plots unpack this story for π<sub>0.5</sub>: the left chart tracks the in-domain regime, while the right chart shows the harder texture-randomized setting where visual and frictional statistics shift away from training.
+            </p>
+            <div class="results-charts-row">
+                <div id="chart-container" class="d3-chart-container"></div>
+                <div id="chart-container-2" class="d3-chart-container"></div>
+            </div>
+            <p class="section-desc">
+                These curves reveal the core asymmetry between real and synthetic supervision. Real data is stronger in the extreme low-data regime, but synthetic data scales far more effectively: performance keeps rising as more generated trajectories are added, while real-data gains saturate. In the representative in-domain setting, one real demonstration is worth roughly <strong>15 synthetic trajectories</strong> near saturation; under texture generalization, that equivalence tightens to roughly <strong>5 synthetic trajectories</strong> per real sample.
+            </p>
+            <div class="results-phy-chapter">
+                <p class="section-desc">
+                    Numbers alone do not show what zero-shot transfer actually looks like on a robot. The videos below therefore move from the representative long-horizon T-shirt folding benchmark to harder deployments on garments whose material, shape, and appearance differ substantially from the training distribution.
+                </p>
+                <div class="solver-gallery results-videos-gallery">
+                    <div class="solver-reel" id="resultsReelZip1"></div>
+                </div>
+                <div class="solver-nav-row">
+                    <button class="solver-nav-btn solver-nav-prev" id="resultsPrevZip1" aria-label="Previous row 1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <button class="solver-nav-btn solver-nav-next" id="resultsNextZip1" aria-label="Next row 1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+                <div class="solver-gallery results-videos-gallery results-videos-gallery--second">
+                    <div class="solver-reel" id="resultsReelZip"></div>
+                </div>
+                <div class="solver-nav-row">
+                    <button class="solver-nav-btn solver-nav-prev" id="resultsPrevZip" aria-label="Previous row 2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <button class="solver-nav-btn solver-nav-next" id="resultsNextZip" aria-label="Next row 2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+                <p class="section-desc">
+                    The top row highlights successful real-robot execution on the benchmark T-shirt task from grasping through folding completion. The bottom row emphasizes generalization: SIM1-trained policies remain effective on out-of-domain garments, including cases with material, size, and geometry configurations not seen during training, where real-data baselines become markedly less reliable.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Live Demo -->
+    <section id="demo" class="section section-dark">
+        <div class="container">
+            <h2 class="section-title">Try It Yourself</h2>
+            <p class="section-desc">
+                SIM1's simulation runs in real time on GPU. Below is the same teleoperation interface our operators use to record the demonstrations that seed the entire pipeline. This is where the data journey begins — from here, SIM1 handles the rest.
+            </p>
+            <div class="demo-container">
+                <iframe 
+                    src="https://sim1-demo.intern-robotics.com/" 
+                    class="demo-iframe"
+                    allow="fullscreen"
+                    loading="lazy"
+                    title="Teleoperation Controller Demo"
+                ></iframe>
+            </div>
+        </div>
+    </section>
+
+    <!-- One more thing -->
+    <section id="coming-soon" class="section section-dark">
+        <div class="container">
+            <h2 class="section-title">One More Thing</h2>
+            <p class="section-desc">
+                We are also building a next-generation deformable simulator based on <strong>IPC</strong>, designed for <strong>high-frame-rate</strong>, high-fidelity cloth and contact simulation. The goal is not just visual realism, but robust, penetration-free interaction under aggressive rigid-deformable contact at speeds practical for large-scale data generation.
+            </p>
+            <p class="section-desc">
+                This system is still under active development. We will share quantitative results, videos, and technical details as soon as the simulator is ready.
+            </p>
+            <h3 class="subsection-title">IPC-Based Simulator Preview</h3>
+            <div class="solver-gallery results-videos-gallery results-videos-gallery--novel">
+                <div class="solver-reel" id="resultsReelNovel"></div>
+            </div>
+            <div class="solver-nav-row">
+                <button class="solver-nav-btn solver-nav-prev" id="resultsPrevNovel" aria-label="Previous novel solver videos">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <button class="solver-nav-btn solver-nav-next" id="resultsNextNovel" aria-label="Next novel solver videos">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Citation -->
+    <section id="citation" class="section">
+        <div class="container">
+            <h2 class="section-title">Citation</h2>
+            <div class="citation-box">
+                <button type="button" class="citation-copy-btn" title="Copy citation" aria-label="Copy citation">
+                    <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                    <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                </button>
+                <div class="citation-scroll">
+                <pre><code>@article{sim1_2026,
+    title   = {SIM1: Physics-Aligned Simulator as Zero-Shot Data Scaler in Deformable Worlds},
+    author  = {Yunsong Zhou and Hangxu Liu and Xuekun Jiang and Xing Shen and Xingyi Liu and Yuanzhen Zhou and Hui Wang and Baole Fang and Yang Tian and Zihan Zhang and Ziqi Fan and Mulin Yu and Qiaojun Yu and Li Ma and Hengjie Li and Hanqing Wang and Jia Zeng and Jiangmiao Pang},
+    year    = {2026},
+    note    = {https://internrobotics.github.io/sim1.github.io/},
+}</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Newsletter -->
+    <section class="section section-dark newsletter">
+        <div class="container">
+            <h2 class="section-title">Stay in the Loop</h2>
+            <p class="section-desc">Get notified about live demos, challenges, and the latest research updates.</p>
+            <form class="newsletter-form">
+                <input type="email" placeholder="Enter your email" class="email-input">
+                <button type="submit" class="submit-btn">Subscribe</button>
+            </form>
+            <p class="form-note">No spam, ever. Unsubscribe anytime.</p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; InternRobotics. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <button type="button" class="back-to-top-btn" id="backToTopBtn" aria-label="Back to top">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+    </button>
+
+    <script src="scripts/trajectory-viz.js?v=2"></script>
+    <script src="scripts/solver-comparison-viz.js?v=8"></script>
+    <script type="module">
+        // Bump ?v= when editing pca-scatter-3d.js — ES modules are cached aggressively; plain refresh often keeps the old file.
+        import('./scripts/pca-scatter-3d.js?v=4').catch(function (err) {
+            console.error(err);
+            var el = document.getElementById('pcaScatter3d');
+            if (!el) return;
+            el.classList.remove('pca-scatter-canvas--loading');
+            el.classList.add('pca-scatter-canvas--error');
+            el.textContent =
+                'Could not load the PCA 3D viewer (Three.js module failed). Check network/CDN access, or open this site via a local server: python3 -m http.server in the Webpage folder.';
+        });
+    </script>
+    <script src="scripts/kai-coverflow.js?v=3"></script>
+    <script src="script.js?v=8"></script>
+    <script src="scripts/results-chart.js?v=3"></script>
+    <script src="scripts/results-chart-2.js?v=3"></script>
+</body>
+</html>
