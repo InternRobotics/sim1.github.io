@@ -194,6 +194,98 @@ SIM1.heroTryAutoplay = () => {};
         return Math.min(1, end / v.duration);
     }
 
+    /** Off-DOM preload so current tier keeps playing until next tier is buffered. */
+    function preloadVideoUrl(url, onReady, onError) {
+        let settled = false;
+        const p = document.createElement('video');
+        p.muted = true;
+        p.setAttribute('playsinline', '');
+        p.preload = 'auto';
+        p.style.cssText =
+            'position:absolute;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none;visibility:hidden';
+        p.src = url;
+        document.body.appendChild(p);
+        p.load();
+        const finishOk = () => {
+            if (settled) return;
+            settled = true;
+            if (p.parentNode) p.parentNode.removeChild(p);
+            onReady();
+        };
+        const finishErr = () => {
+            if (settled) return;
+            settled = true;
+            if (p.parentNode) p.parentNode.removeChild(p);
+            onError();
+        };
+        p.addEventListener('canplaythrough', finishOk, { once: true });
+        p.addEventListener('error', finishErr, { once: true });
+        p.addEventListener(
+            'canplay',
+            () => {
+                if (p.readyState >= 3) finishOk();
+            },
+            { once: true }
+        );
+    }
+
+    function freezeCurrentFrameAsPoster(v) {
+        try {
+            const w = v.videoWidth;
+            const h = v.videoHeight;
+            if (!w || !h) return;
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(v, 0, 0);
+            v.poster = canvas.toDataURL('image/jpeg', 0.82);
+        } catch (e) {}
+    }
+
+    function clearTierPoster(v) {
+        v.removeAttribute('poster');
+    }
+
+    /** After preload, swap main element src; poster hides decode gap. */
+    function swapMainToUrl(v, st, url, nextPhase, savedTime, wasPlaying, onDone, onFail) {
+        const vw = v.closest('.video-wrapper');
+        if (vw) vw.classList.add('demo-poster-ready');
+        freezeCurrentFrameAsPoster(v);
+        v.src = url;
+        v.load();
+        let applied = false;
+        const apply = () => {
+            if (applied) return;
+            applied = true;
+            v.removeEventListener('canplaythrough', onCap);
+            v.removeEventListener('canplay', onCp);
+            v.removeEventListener('error', onErr);
+            clearTierPoster(v);
+            st.phase = nextPhase;
+            if (v.duration && Number.isFinite(v.duration)) {
+                v.currentTime = Math.min(Math.max(0, savedTime), Math.max(0, v.duration - 0.05));
+            }
+            if (wasPlaying) tryPlayAdaptive(v);
+            if (onDone) onDone();
+        };
+        const onCap = () => apply();
+        const onCp = () => {
+            if (v.readyState >= 3) apply();
+        };
+        const onErr = () => {
+            if (applied) return;
+            applied = true;
+            v.removeEventListener('canplaythrough', onCap);
+            v.removeEventListener('canplay', onCp);
+            v.removeEventListener('error', onErr);
+            clearTierPoster(v);
+            if (onFail) onFail();
+        };
+        v.addEventListener('canplaythrough', onCap, { once: true });
+        v.addEventListener('canplay', onCp, { once: true });
+        v.addEventListener('error', onErr, { once: true });
+    }
+
     function attachHqRing(v) {
         if (hqRingMeta.has(v)) return;
         const host = v.closest('.solver-vid-wrap, .method-video-wrapper, .video-wrapper') || v.parentElement;
@@ -306,37 +398,58 @@ SIM1.heroTryAutoplay = () => {};
 
     function loadHqFallback(v, st) {
         st.phase = 'loading-hq';
-        startHqRingLoad(v, st);
-        v.src = st.hqUrl;
-        v.load();
-        v.addEventListener('canplay', () => {
-            st.phase = 'hq';
-            tryPlayAdaptive(v);
-        }, { once: true });
-        v.addEventListener('error', () => {
-            st.phase = 'idle';
-            stopHqRingLoad(v, st);
-        }, { once: true });
+        preloadVideoUrl(
+            st.hqUrl,
+            () => {
+                freezeCurrentFrameAsPoster(v);
+                startHqRingLoad(v, st);
+                v.src = st.hqUrl;
+                v.load();
+                let applied = false;
+                const apply = () => {
+                    if (applied) return;
+                    applied = true;
+                    stopHqRingLoad(v, st);
+                    clearTierPoster(v);
+                    st.phase = 'hq';
+                    tryPlayAdaptive(v);
+                };
+                v.addEventListener('canplaythrough', apply, { once: true });
+                v.addEventListener('canplay', () => {
+                    if (v.readyState >= 3) apply();
+                }, { once: true });
+                v.addEventListener('error', () => {
+                    st.phase = 'idle';
+                    stopHqRingLoad(v, st);
+                    clearTierPoster(v);
+                }, { once: true });
+            },
+            () => {
+                st.phase = 'idle';
+                stopHqRingLoad(v, st);
+            }
+        );
     }
 
     function loadLowOrHqFromIdle(v, st) {
         if (st.lowUrl) {
             st.phase = 'loading-low';
-            const onLowErr = () => {
-                v.removeEventListener('error', onLowErr);
-                v.removeEventListener('canplay', onLowOk);
-                loadHqFallback(v, st);
-            };
-            const onLowOk = () => {
-                v.removeEventListener('error', onLowErr);
-                st.phase = 'low';
-                tryPlayAdaptive(v);
-                scheduleHqUpgrades();
-            };
-            v.addEventListener('error', onLowErr);
-            v.addEventListener('canplay', onLowOk, { once: true });
-            v.src = st.lowUrl;
-            v.load();
+            preloadVideoUrl(
+                st.lowUrl,
+                () => {
+                    swapMainToUrl(
+                        v,
+                        st,
+                        st.lowUrl,
+                        'low',
+                        0,
+                        false,
+                        () => scheduleHqUpgrades(),
+                        () => loadHqFallback(v, st)
+                    );
+                },
+                () => loadHqFallback(v, st)
+            );
         } else {
             loadHqFallback(v, st);
         }
@@ -395,46 +508,88 @@ SIM1.heroTryAutoplay = () => {};
         if (st.phase !== 'super' || st.upgradingLow || !st.lowUrl || !st.inView) return;
         st.upgradingLow = true;
         lowUpgradeCount++;
-        const t = v.currentTime;
+        const savedTime = v.currentTime;
         const wasPlaying = !v.paused;
-        const onDone = () => {
-            v.removeEventListener('canplay', onDone);
-            v.removeEventListener('error', onFail);
-            st.phase = 'low';
-            st.upgradingLow = false;
-            lowUpgradeCount--;
-            if (v.duration && Number.isFinite(v.duration)) {
-                v.currentTime = Math.min(Math.max(0, t), Math.max(0, v.duration - 0.05));
-            }
-            if (wasPlaying) tryPlayAdaptive(v);
-            scheduleHqUpgrades();
-            scheduleLowUpgrades();
-        };
-        const onFail = () => {
-            v.removeEventListener('canplay', onDone);
-            v.removeEventListener('error', onFail);
+        const handleLowTierFail = () => {
             st.upgradingLow = false;
             lowUpgradeCount--;
             if (st.hqUrl) {
-                st.phase = 'loading-hq';
-                startHqRingLoad(v, st);
-                v.src = st.hqUrl;
-                v.load();
-                v.addEventListener('canplay', () => {
-                    st.phase = 'hq';
-                    tryPlayAdaptive(v);
-                }, { once: true });
-                v.addEventListener('error', () => {
-                    st.phase = 'idle';
-                    stopHqRingLoad(v, st);
-                }, { once: true });
+                startHqUpgradeFromSuperAfterLowFail(v, st, savedTime, wasPlaying);
             }
             scheduleLowUpgrades();
         };
-        v.addEventListener('canplay', onDone, { once: true });
-        v.addEventListener('error', onFail, { once: true });
-        v.src = st.lowUrl;
-        v.load();
+        preloadVideoUrl(
+            st.lowUrl,
+            () => {
+                swapMainToUrl(
+                    v,
+                    st,
+                    st.lowUrl,
+                    'low',
+                    savedTime,
+                    wasPlaying,
+                    () => {
+                        st.upgradingLow = false;
+                        lowUpgradeCount--;
+                        scheduleHqUpgrades();
+                        scheduleLowUpgrades();
+                    },
+                    handleLowTierFail
+                );
+            },
+            handleLowTierFail
+        );
+    }
+
+    /** Low tier preload failed while still on super — try HQ with same smooth swap. */
+    function startHqUpgradeFromSuperAfterLowFail(v, st, savedTime, wasPlaying) {
+        if (!st.hqUrl || st.upgrading) return;
+        st.upgrading = true;
+        hqUpgradeCount++;
+        preloadVideoUrl(
+            st.hqUrl,
+            () => {
+                freezeCurrentFrameAsPoster(v);
+                startHqRingLoad(v, st);
+                v.src = st.hqUrl;
+                v.load();
+                let applied = false;
+                const apply = () => {
+                    if (applied) return;
+                    applied = true;
+                    stopHqRingLoad(v, st);
+                    clearTierPoster(v);
+                    st.phase = 'hq';
+                    st.upgrading = false;
+                    hqUpgradeCount--;
+                    if (v.duration && Number.isFinite(v.duration)) {
+                        v.currentTime = Math.min(Math.max(0, savedTime), Math.max(0, v.duration - 0.05));
+                    }
+                    if (wasPlaying) tryPlayAdaptive(v);
+                    scheduleHqUpgrades();
+                };
+                v.addEventListener('canplaythrough', apply, { once: true });
+                v.addEventListener('canplay', () => {
+                    if (v.readyState >= 3) apply();
+                }, { once: true });
+                v.addEventListener(
+                    'error',
+                    () => {
+                        st.upgrading = false;
+                        hqUpgradeCount--;
+                        stopHqRingLoad(v, st);
+                        clearTierPoster(v);
+                        scheduleHqUpgrades();
+                    },
+                    { once: true }
+                );
+            },
+            () => {
+                st.upgrading = false;
+                hqUpgradeCount--;
+                scheduleHqUpgrades();
+            }
+        );
     }
 
     function scheduleLowUpgrades() {
@@ -459,33 +614,44 @@ SIM1.heroTryAutoplay = () => {};
         if ((!fromLow && !fromSuperNoLow) || st.upgrading) return;
         st.upgrading = true;
         hqUpgradeCount++;
-        const t = v.currentTime;
+        const savedTime = v.currentTime;
         const wasPlaying = !v.paused;
-        startHqRingLoad(v, st);
-        const onDone = () => {
-            v.removeEventListener('canplay', onDone);
-            v.removeEventListener('error', onFail);
-            st.phase = 'hq';
-            st.upgrading = false;
-            hqUpgradeCount--;
-            if (v.duration && Number.isFinite(v.duration)) {
-                v.currentTime = Math.min(Math.max(0, t), Math.max(0, v.duration - 0.05));
-            }
-            if (wasPlaying) tryPlayAdaptive(v);
-            scheduleHqUpgrades();
-        };
         const onFail = () => {
-            v.removeEventListener('canplay', onDone);
-            v.removeEventListener('error', onFail);
             st.upgrading = false;
             hqUpgradeCount--;
             stopHqRingLoad(v, st);
             scheduleHqUpgrades();
         };
-        v.addEventListener('canplay', onDone, { once: true });
-        v.addEventListener('error', onFail, { once: true });
-        v.src = st.hqUrl;
-        v.load();
+        preloadVideoUrl(
+            st.hqUrl,
+            () => {
+                freezeCurrentFrameAsPoster(v);
+                startHqRingLoad(v, st);
+                v.src = st.hqUrl;
+                v.load();
+                let applied = false;
+                const apply = () => {
+                    if (applied) return;
+                    applied = true;
+                    stopHqRingLoad(v, st);
+                    clearTierPoster(v);
+                    st.phase = 'hq';
+                    st.upgrading = false;
+                    hqUpgradeCount--;
+                    if (v.duration && Number.isFinite(v.duration)) {
+                        v.currentTime = Math.min(Math.max(0, savedTime), Math.max(0, v.duration - 0.05));
+                    }
+                    if (wasPlaying) tryPlayAdaptive(v);
+                    scheduleHqUpgrades();
+                };
+                v.addEventListener('canplaythrough', apply, { once: true });
+                v.addEventListener('canplay', () => {
+                    if (v.readyState >= 3) apply();
+                }, { once: true });
+                v.addEventListener('error', onFail, { once: true });
+            },
+            onFail
+        );
     }
 
     function scheduleHqUpgrades() {
