@@ -1656,11 +1656,10 @@ console.log('Psi0 Website Loaded Successfully!');
     initSolverReel(reel2, document.getElementById('resultsPrevZip'), document.getElementById('resultsNextZip'));
 
     const novelSolverFiles = [
-        'scene_550.mp4',
-        'scene_551.mp4',
+        'demo2.mp4',
+        'demo4.mp4',
         'scene_552.mp4',
         'scene_553.mp4',
-        'scene_554.mp4',
         'scene_560.mp4',
         'scene_561.mp4',
         'scene_562.mp4',
